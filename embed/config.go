@@ -505,6 +505,7 @@ func (cfg *Config) PeerURLsMapAndToken(which string) (urlsmap types.URLsMap, tok
 	return urlsmap, token, err
 }
 
+// 指定集群名称和api列表
 func (cfg Config) InitialClusterFromName(name string) (ret string) {
 	if len(cfg.APUrls) == 0 {
 		return ""
@@ -566,9 +567,22 @@ func (cfg *Config) PeerSelfCert() (err error) {
 // User can work around this by explicitly setting URL with 127.0.0.1.
 // It returns the default hostname, if used, and the error, if any, from getting the machine's default host.
 // TODO: check whether fields are set instead of whether fields have default value
+// 更新集群通告URL（如果可用）默认主机，
+// 如果广告URL是默认值（localhost：2379,2380），并且listen URL是0.0.0.0。
+// 例如 通告对端URL localhost：2380或监听对端URL 0.0.0.0:2380
+//     2379 是node间通信端口, 2380 是 raft 通信端口
+// 然后广告对等主机将使用机器的默认主机进行更新，
+// 保持监听URL的端口。
+// 用户可以通过使用127.0.0.1明确设置URL来解决这个问题。
+// 它返回默认主机名（如果使用的话）以及错误（如果有的话）来获取机器的默
+// todo 检查字段是否设置，而不是字段是否具有默认值
 func (cfg *Config) UpdateDefaultClusterFromName(defaultInitialCluster string) (string, error) {
+	// 解析 --name=abc 替换默认的 name=default
+	// 如果没有指定 name, 设置为 default
+	// 如果没有指定 apilist, 默认把本机 ip 加进去
 	if defaultHostname == "" || defaultHostStatus != nil {
 		// update 'initial-cluster' when only the name is specified (e.g. 'etcd --name=abc')
+		// 用指定的 Name 替换默认的 default
 		if cfg.Name != DefaultName && cfg.InitialCluster == defaultInitialCluster {
 			cfg.InitialCluster = cfg.InitialClusterFromName(cfg.Name)
 		}

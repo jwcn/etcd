@@ -56,9 +56,11 @@ var (
 func startEtcdOrProxyV2() {
 	grpc.EnableTracing = false
 
+	// 获取启动命令后的所有启动参数&映射
 	cfg := newConfig()
 	defaultInitialCluster := cfg.ec.InitialCluster
 
+	// 解析启动时带的参数
 	err := cfg.parse(os.Args[1:])
 	if err != nil {
 		plog.Errorf("error verifying flags, %v. See 'etcd --help'.", err)
@@ -68,11 +70,13 @@ func startEtcdOrProxyV2() {
 		}
 		os.Exit(1)
 	}
+	// 初始化日志
 	cfg.ec.SetupLogging()
 
 	var stopped <-chan struct{}
 	var errc <-chan error
 
+	// Debug 输出项
 	plog.Infof("etcd Version: %s\n", version.Version)
 	plog.Infof("Git SHA: %s\n", version.GitSHA)
 	plog.Infof("Go Version: %s\n", runtime.Version())
@@ -81,6 +85,7 @@ func startEtcdOrProxyV2() {
 	GoMaxProcs := runtime.GOMAXPROCS(0)
 	plog.Infof("setting maximum number of CPUs to %d, total number of available CPUs is %d", GoMaxProcs, runtime.NumCPU())
 
+	// 更新集群通告URL默认主机，
 	defaultHost, dhErr := (&cfg.ec).UpdateDefaultClusterFromName(defaultInitialCluster)
 	if defaultHost != "" {
 		plog.Infof("advertising using detected default host %q", defaultHost)
@@ -94,6 +99,9 @@ func startEtcdOrProxyV2() {
 		plog.Warningf("no data-dir provided, using default data-dir ./%s", cfg.ec.Dir)
 	}
 
+	// 解析 --data-dir 参数
+	// 根据目录下文件名标识启动不同类型节点(非首次启动)
+	// 意思可能是第一次启动本机的节点是啥类型, 以后还是啥类型
 	which := identifyDataDirOrDie(cfg.ec.Dir)
 	if which != dirEmpty {
 		plog.Noticef("the server is already initialized as %v before, starting as etcd %v...", which, which)
@@ -106,6 +114,9 @@ func startEtcdOrProxyV2() {
 			plog.Panicf("unhandled dir type %v", which)
 		}
 	} else {
+		// 首次启动节点, 没在目录下找到历史节点类型
+		// 解析 --proxy=on
+		// 对应启动本机为 member || proxy 类型节点
 		shouldProxy := cfg.isProxy()
 		if !shouldProxy {
 			stopped, errc, err = startEtcd(&cfg.ec)
@@ -164,6 +175,10 @@ func startEtcdOrProxyV2() {
 	// for accepting connections. The etcd instance should be
 	// joined with the cluster and ready to serve incoming
 	// connections.
+	// 此时，etcd的初始化完成。
+	// 侦听器正在侦听TCP端口并准备就绪
+	// 开始接受连接。 etcd实例应该是与集群连接并准备投入服务连接。
+	// 最后, 打印个 log 吧
 	notifySystemd()
 
 	select {
@@ -182,6 +197,7 @@ func startEtcd(cfg *embed.Config) (<-chan struct{}, <-chan error, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	// 注册关闭函数到信号量协程里, 用于停止 ectd 后的一些善后工作
 	osutil.RegisterInterruptHandler(e.Close)
 	select {
 	case <-e.Server.ReadyNotify(): // wait for e.Server to join the cluster
@@ -349,6 +365,11 @@ func startProxy(cfg *config) error {
 
 // identifyDataDirOrDie returns the type of the data dir.
 // Dies if the datadir is invalid.
+// 返回数据目录的类型。
+// 遍历目录, 判断文件名
+// 如果有文件名为 member, 则启动为 member 节点
+// 有 proxy 则启动 HTTP proxy 代理节点
+// 都不存在返回 empty
 func identifyDataDirOrDie(dir string) dirType {
 	names, err := fileutil.ReadDir(dir)
 	if err != nil {

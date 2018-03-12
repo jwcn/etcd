@@ -33,6 +33,8 @@ var errNoDefaultInterface = fmt.Errorf("could not find default interface")
 
 // GetDefaultHost obtains the first IP address of machine from the routing table and returns the IP address as string.
 // An IPv4 address is preferred to an IPv6 address for backward compatibility.
+// 从路由表中获取机器的第一个IP地址，并以字符串形式返回IP地址。
+// 为了向下兼容，IPv4地址优先于IPv6地址。
 func GetDefaultHost() (string, error) {
 	rmsgs, rerr := getDefaultRoutes()
 	if rerr != nil {

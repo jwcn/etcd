@@ -24,6 +24,8 @@ import (
 )
 
 func Main() {
+	// 检查环境变量
+	// 非 amd64(Linux) 和 ppc64le(MAC) 手工设置环境变量
 	checkSupportArch()
 
 	if len(os.Args) > 1 {
@@ -43,6 +45,7 @@ func Main() {
 		}
 	}
 
+	// 启动 V2
 	startEtcdOrProxyV2()
 }
 
